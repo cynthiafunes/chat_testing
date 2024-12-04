@@ -99,3 +99,32 @@ def test_message_integrity():
     for c in clients:
         c.close()
     server.close()
+
+def test_client_disconnection():
+    """Prueba que el servidor maneja correctamente la desconexión repentina"""
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(('127.0.0.1', 55557))
+    server.listen()
+    
+    def handle_client():
+        conn, _ = server.accept()
+        try:
+            conn.recv(1024)
+            return False
+        except:
+            return True
+        finally:
+            conn.close()
+
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect(('127.0.0.1', 55557))
+    
+    client.shutdown(socket.SHUT_RDWR)
+    client.close()
+    
+    conn, _ = server.accept()
+    resultado = conn.recv(1024) == b""
+    conn.close()
+    server.close()
+    
+    assert resultado, "La desconexión no fue detectada"
