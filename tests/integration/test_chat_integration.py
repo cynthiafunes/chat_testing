@@ -61,3 +61,41 @@ def test_multiple_clients_chat():
         for client in clients:
             client.close()
         server.close()
+
+def test_message_integrity():
+    """Prueba que los mensajes no se pierden ni se duplican"""
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(('127.0.0.1', 55557))
+    server.listen()
+    
+    mensajes_recibidos = []
+    
+    def accept_and_handle():
+        for _ in range(2):
+            conn, _ = server.accept()
+            data = conn.recv(1024)
+            mensajes_recibidos.append(data)
+            conn.send(b"OK")
+            conn.close()
+
+    server_thread = threading.Thread(target=accept_and_handle)
+    server_thread.daemon = True
+    server_thread.start()
+
+    clients = []
+    messages = [b"Test1", b"Test2"]
+    
+    for msg in messages:
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client.settimeout(1)
+        client.connect(('127.0.0.1', 55557))
+        client.send(msg)
+        assert client.recv(1024) == b"OK"
+        clients.append(client)
+
+    assert len(mensajes_recibidos) == 2
+    assert set(mensajes_recibidos) == set(messages)
+
+    for c in clients:
+        c.close()
+    server.close()
