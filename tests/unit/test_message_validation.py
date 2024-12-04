@@ -2,6 +2,7 @@ import pytest
 import socket
 import threading
 import time
+from src.message_validator import validate_message
 
 def test_validacion_mensaje_vacio():
     """Prueba que el servidor rechaza mensajes vacios"""
@@ -12,12 +13,8 @@ def test_validacion_mensaje_vacio():
     def handle_client(conn):
         try:
             data = conn.recv(1024)
-            if len(data.strip()) == 0:
-                conn.send(b"ERROR")
-            else:
-                conn.send(b"OK")
-        except Exception as e:
-            print(f"Error en handle_client: {e}")
+            valid, response = validate_message(data)
+            conn.send(response)
         finally:
             conn.close()
 
