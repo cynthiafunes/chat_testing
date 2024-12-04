@@ -128,3 +128,23 @@ def test_client_disconnection():
     server.close()
     
     assert resultado, "La desconexión no fue detectada"
+
+def test_casos_negativos():
+    """Prueba casos de error y situaciones negativas"""
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(('127.0.0.1', 55557))
+    server.listen()
+
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    with pytest.raises(ConnectionRefusedError):
+        client.connect(('127.0.0.1', 55558))
+    client.close()
+
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect(('127.0.0.1', 55557))
+    client.close()
+    
+    with pytest.raises(OSError):
+        client.send(b"mensaje despues de desconexion")
+
+    server.close()
