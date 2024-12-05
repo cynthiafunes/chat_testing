@@ -3,12 +3,17 @@ import socket
 import threading
 import time
 
-def test_multiple_clients_chat():
-    """Prueba la interacción entre múltiples clientes en el chat"""
+@pytest.fixture
+def integration_server():
+    """Fixture para pruebas de integración"""
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(('127.0.0.1', 55557))
     server.listen()
-    
+    yield server
+    server.close()
+
+def test_multiple_clients_chat(integration_server):
+    """Prueba la interacción entre múltiples clientes en el chat"""
     mensajes_recibidos = []
     
     def handle_client(conn):
@@ -23,7 +28,7 @@ def test_multiple_clients_chat():
 
     def accept_clients():
         for _ in range(3):  
-            conn, _ = server.accept()
+            conn, _ = integration_server.accept()
             client_thread = threading.Thread(target=handle_client, args=(conn,))
             client_thread.daemon = True
             client_thread.start()
@@ -60,19 +65,15 @@ def test_multiple_clients_chat():
     finally:
         for client in clients:
             client.close()
-        server.close()
+        integration_server.close()
 
-def test_message_integrity():
+def test_message_integrity(integration_server):
     """Prueba que los mensajes no se pierden ni se duplican"""
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(('127.0.0.1', 55557))
-    server.listen()
-    
     mensajes_recibidos = []
     
     def accept_and_handle():
         for _ in range(2):
-            conn, _ = server.accept()
+            conn, _ = integration_server.accept()
             data = conn.recv(1024)
             mensajes_recibidos.append(data)
             conn.send(b"OK")
@@ -98,43 +99,23 @@ def test_message_integrity():
 
     for c in clients:
         c.close()
-    server.close()
+    integration_server.close()
 
-def test_client_disconnection():
-    """Prueba que el servidor maneja correctamente la desconexión repentina"""
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(('127.0.0.1', 55557))
-    server.listen()
-    
-    def handle_client():
-        conn, _ = server.accept()
-        try:
-            conn.recv(1024)
-            return False
-        except:
-            return True
-        finally:
-            conn.close()
-
+def test_client_disconnection(integration_server):
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect(('127.0.0.1', 55557))
     
     client.shutdown(socket.SHUT_RDWR)
     client.close()
     
-    conn, _ = server.accept()
-    resultado = conn.recv(1024) == b""
+    conn, _ = integration_server.accept()
+    resultado = conn.recv(1024) == b"" 
     conn.close()
-    server.close()
     
     assert resultado, "La desconexión no fue detectada"
 
-def test_casos_negativos():
+def test_casos_negativos(integration_server):
     """Prueba casos de error y situaciones negativas"""
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(('127.0.0.1', 55557))
-    server.listen()
-
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     with pytest.raises(ConnectionRefusedError):
         client.connect(('127.0.0.1', 55558))
@@ -147,4 +128,4 @@ def test_casos_negativos():
     with pytest.raises(OSError):
         client.send(b"mensaje despues de desconexion")
 
-    server.close()
+    integration_server.close()

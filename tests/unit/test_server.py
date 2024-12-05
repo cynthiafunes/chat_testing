@@ -39,8 +39,8 @@ def test_envio_mensaje(server_socket):
     thread.join(timeout=1)
     client.close()
 
-def test_broadcast_mensajes(server_socket):
-    """Prueba que un mensaje llega a múltiples clientes"""
+def test_servidor_recibe_mensajes_multiples(server_socket):
+    """Prueba que el servidor puede recibir mensajes de múltiples clientes"""
     mensajes_recibidos = []
     conexiones_completas = threading.Event()
     
@@ -113,51 +113,7 @@ def test_manejo_desconexion(server_socket):
     time.sleep(0.2)
     assert len(desconexiones) == 1, "No se detectó la desconexión del cliente"
 
-def test_recepcion_multiples_clientes(server_socket):
-    """Prueba que el servidor puede recibir múltiples clientes"""
-    conexiones = []
-    clientes_conectados = threading.Event()
-    
-    def handle_client(conn):
-        try:
-            usuario = conn.recv(1024).decode('utf-8')
-            assert usuario.startswith('usuario'), "No se recibió el formato correcto de usuario"
-        finally:
-            conn.close()
-
-    def accept_clients():
-        for _ in range(3): 
-            conn, _ = server_socket.accept()
-            conexiones.append(conn)
-            client_thread = threading.Thread(target=handle_client, args=(conn,))
-            client_thread.start()
-        clientes_conectados.set()
-
-    accept_thread = threading.Thread(target=accept_clients)
-    accept_thread.start()
-
-    clientes = []
-    for i in range(3):
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client.connect(('127.0.0.1', 55557))
-        client.send(f"usuario{i}".encode('utf-8'))
-        clientes.append(client)
-        time.sleep(0.1)
-
-    assert clientes_conectados.wait(timeout=2), "No todos los clientes se conectaron a tiempo"
-    assert len(conexiones) == 3, f"Se esperaban 3 conexiones, se recibieron {len(conexiones)}"
-
-    for client in clientes:
-        client.close()
-    for conn in conexiones:
-        conn.close()
-
-def test_validacion_mensaje_vacio():
-    """Prueba que el servidor rechaza mensajes vacios"""
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(('127.0.0.1', 55557))
-    server.listen()
-    
+def test_validacion_mensaje_vacio(server_socket):
     def handle_client(conn):
         try:
             data = conn.recv(1024)
@@ -166,7 +122,7 @@ def test_validacion_mensaje_vacio():
         finally:
             conn.close()
 
-    server_thread = threading.Thread(target=lambda: handle_client(server.accept()[0]))
+    server_thread = threading.Thread(target=lambda: handle_client(server_socket.accept()[0]))
     server_thread.daemon = True
     server_thread.start()
 
@@ -180,5 +136,5 @@ def test_validacion_mensaje_vacio():
         assert response == b"ERROR"
     finally:
         client.close()
-        server.close()
+        server_socket.close()
         server_thread.join(timeout=1)
